@@ -24,22 +24,22 @@ local bossEnabled = {}
 local npcEnabled = {}
 local threads = {}
 
--- Configurações ultra rápidas
+-- Configurações (valores fixos conforme solicitado)
 local config = {
     autoPlant = true,
-    plantBurstCount = 50,
-    plantBurstDelay = 0.001,
+    plantBurstCount = 9,        -- máximo 9
+    plantBurstDelay = 0.001,     -- ultra rápido
     autoHash = true,
-    hashCount = 30,
-    hashDelay = 0.0001,
+    hashCount = 1,               -- 1 click
+    hashDelay = 0.0001,          -- ultra rápido
     autoFeedNests = false,
-    feedDelay = 0.0001,
+    feedDelay = 0.001,           -- rápido
     farmBosses = true,
-    bossDelay = 0.1,
+    bossDelay = 0.5,
     farmSummer = true,
-    summerDelay = 0.001,
+    summerDelay = 0.01,          -- rápido
     farmFood = true,
-    foodDelay = 0.001,
+    foodDelay = 0.01,            -- rápido
     farmNPCs = false,
     npcDelay = 0.5,
 }
@@ -76,10 +76,9 @@ for _, v in ipairs(bossList) do bossEnabled[v.name] = true end
 local bossCooldown = {}
 for _, v in ipairs(bossList) do bossCooldown[v.name] = 0 end
 
--- NPCs
+-- NPCs (apenas exemplo)
 local npcZones = {
     ["Zone 1"] = { "Evil Shroom", "Evil Foot", "Deermon" },
-    ["Zone 2"] = { "Creepy Cat", "Enchanted Cobra", "Cursed Mummy" },
 }
 for zone, npcs in pairs(npcZones) do
     npcEnabled[zone] = npcEnabled[zone] or {}
@@ -106,6 +105,7 @@ local function findNilBoss(name)
     end
 end
 
+-- Limpeza de cache
 task.spawn(function() while task.wait(300) do cacheZones = {} end end)
 
 -- ========== LOOPS INDIVIDUAIS ==========
@@ -214,7 +214,7 @@ local function BossLoop()
                 end
             end
         end
-        task.wait(0.05)
+        task.wait(0.1)
     end
 end
 
@@ -275,7 +275,7 @@ end
 local win = Rayfield:CreateWindow({
     Name = "Maverick Hub",
     LoadingTitle = "Carregando...",
-    LoadingSubtitle = "Ultra Rápido",
+    LoadingSubtitle = "Máxima Velocidade",
     ConfigurationSaving = { Enabled = true, FolderName = "MaverickHub", FileName = "Config" },
     Theme = "Dark"
 })
@@ -355,17 +355,17 @@ end
 
 eggTab:CreateSection("Auto Hash")
 eggTab:CreateToggle({ Name = "Ativar Hash", CurrentValue = config.autoHash, Callback = function(v) config.autoHash = v end })
-eggTab:CreateSlider({ Name = "Quantidade", Range = {1, 50}, Increment = 5, Suffix = "x", CurrentValue = config.hashCount, Callback = function(v) config.hashCount = v end })
-eggTab:CreateSlider({ Name = "Delay (s)", Range = {0.0001, 0.01}, Increment = 0.0001, Suffix = "s", CurrentValue = config.hashDelay, Callback = function(v) config.hashDelay = v end })
+eggTab:CreateSlider({ Name = "Quantidade", Range = {1, 1}, Increment = 1, Suffix = "x", CurrentValue = config.hashCount, Callback = function(v) config.hashCount = v end })
+eggTab:CreateSlider({ Name = "Delay (s)", Range = {0.0001, 0.001}, Increment = 0.0001, Suffix = "s", CurrentValue = config.hashDelay, Callback = function(v) config.hashDelay = v end })
 
 eggTab:CreateSection("Auto Plant")
 eggTab:CreateToggle({ Name = "Ativar Plant", CurrentValue = config.autoPlant, Callback = function(v) config.autoPlant = v end })
-eggTab:CreateSlider({ Name = "Ovos por burst", Range = {10, 100}, Increment = 10, Suffix = "x", CurrentValue = config.plantBurstCount, Callback = function(v) config.plantBurstCount = v end })
+eggTab:CreateSlider({ Name = "Ovos por burst", Range = {9, 9}, Increment = 1, Suffix = "x", CurrentValue = config.plantBurstCount, Callback = function(v) config.plantBurstCount = v end })
 eggTab:CreateSlider({ Name = "Delay entre bursts (s)", Range = {0.001, 0.1}, Increment = 0.001, Suffix = "s", CurrentValue = config.plantBurstDelay, Callback = function(v) config.plantBurstDelay = v end })
 
 eggTab:CreateSection("Auto Nests")
 eggTab:CreateToggle({ Name = "Ativar Nests", CurrentValue = config.autoFeedNests, Callback = function(v) config.autoFeedNests = v end })
-eggTab:CreateSlider({ Name = "Delay (s)", Range = {0.0001, 0.01}, Increment = 0.0001, Suffix = "s", CurrentValue = config.feedDelay, Callback = function(v) config.feedDelay = v end })
+eggTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 0.01}, Increment = 0.001, Suffix = "s", CurrentValue = config.feedDelay, Callback = function(v) config.feedDelay = v end })
 
 -- Aba Bosses
 bossTab:CreateSection("Controle de Bosses")
@@ -383,7 +383,7 @@ for _, boss in ipairs(bossList) do
         Callback = function(v) bossEnabled[boss.name] = v end,
     })
 end
-bossTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.1, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.bossDelay, Callback = function(v) config.bossDelay = v end })
+bossTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.5, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.bossDelay, Callback = function(v) config.bossDelay = v end })
 
 -- Aba NPCs
 npcTab:CreateSection("Controle de NPCs")
@@ -407,7 +407,7 @@ for zoneName, npcs in pairs(npcZones) do
         })
     end
 end
-npcTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.1, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.npcDelay, Callback = function(v) config.npcDelay = v end })
+npcTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.5, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.npcDelay, Callback = function(v) config.npcDelay = v end })
 
 -- Aba Farms
 otherTab:CreateSection("Summer Event")
@@ -416,7 +416,7 @@ otherTab:CreateToggle({
     CurrentValue = config.farmSummer,
     Callback = function(v) config.farmSummer = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
 
 otherTab:CreateSection("Food Farm")
 otherTab:CreateToggle({
@@ -424,4 +424,4 @@ otherTab:CreateToggle({
     CurrentValue = config.farmFood,
     Callback = function(v) config.farmFood = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })

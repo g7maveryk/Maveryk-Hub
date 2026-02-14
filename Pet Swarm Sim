@@ -1,9 +1,7 @@
-
 --[[
     SCRIPT ULTRA VELOZ - MAVERICK HUB
-    Todos os farms rodando em paralelo com máxima prioridade
-    Ajustes: plant 9x ultra rápido, hash 1x ultra rápido, nests rápido,
-    Summer/Food/Bosses em velocidade máxima.
+    Todos os farms rodando em paralelo, com eggs em máxima velocidade
+    e outras farms otimizadas para evitar travamentos.
 --]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -32,7 +30,7 @@ local bossEnabled = {}
 local npcEnabled = {}
 local loopFlags = {}
 
--- Configurações (valores máximos de velocidade)
+-- Configurações (eggs ultra rápidos, outros ajustados para estabilidade)
 local config = {
     autoPlant = true,
     plantBurstCount = 9,
@@ -43,11 +41,11 @@ local config = {
     autoFeedNests = false,
     feedDelay = 0.001,
     farmBosses = true,
-    bossDelay = 0.5,
+    bossDelay = 0.8,
     farmSummer = true,
-    summerDelay = 0.001,
+    summerDelay = 0.05,
     farmFood = true,
-    foodDelay = 0.001,
+    foodDelay = 0.05,
     farmNPCs = false,
     npcDelay = 0.5,
 }
@@ -221,7 +219,7 @@ local function bossLoop()
                 end
             end
         end
-        task.wait(0.05)
+        task.wait(0.1) -- pausa para não sobrecarregar
     end
 end
 
@@ -290,7 +288,7 @@ end
 local win = Rayfield:CreateWindow({
     Name = "Maverick Hub",
     LoadingTitle = "Carregando...",
-    LoadingSubtitle = "Velocidade Máxima",
+    LoadingSubtitle = "Velocidade Máxima (otimizado)",
     ConfigurationSaving = { Enabled = true, FolderName = "MaverickHub", FileName = "Config" },
     Theme = "Dark"
 })
@@ -431,7 +429,7 @@ otherTab:CreateToggle({
     CurrentValue = config.farmSummer,
     Callback = function(v) config.farmSummer = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
 
 otherTab:CreateSection("Food Farm")
 otherTab:CreateToggle({
@@ -439,4 +437,4 @@ otherTab:CreateToggle({
     CurrentValue = config.farmFood,
     Callback = function(v) config.farmFood = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })

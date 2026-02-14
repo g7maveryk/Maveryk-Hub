@@ -22,24 +22,24 @@ local cacheZones = {}
 local eggsSelected = { "SummerEvent1" }
 local bossEnabled = {}
 local npcEnabled = {}
-local threads = {} -- ainda usado para controle, mas teremos um loop principal
+local threads = {}
 
--- Configurações otimizadas para não parar as farms
+-- Configurações ultra rápidas
 local config = {
     autoPlant = true,
-    plantBurstCount = 15,        -- reduzido de 20 para 15
-    plantBurstDelay = 0.02,       -- aumentado de 0.01 para 0.02
+    plantBurstCount = 50,
+    plantBurstDelay = 0.001,
     autoHash = true,
-    hashCount = 3,                -- reduzido de 5 para 3
-    hashDelay = 0.001,             -- aumentado de 0.0001 para 0.001
+    hashCount = 30,
+    hashDelay = 0.0001,
     autoFeedNests = false,
-    feedDelay = 0.001,
+    feedDelay = 0.0001,
     farmBosses = true,
-    bossDelay = 0.8,               -- reduzido de 1.0 para 0.8 (mais rápido)
+    bossDelay = 0.1,
     farmSummer = true,
-    summerDelay = 0.05,             -- aumentado de 0.01 para 0.05 (dá espaço)
+    summerDelay = 0.001,
     farmFood = true,
-    foodDelay = 0.05,               -- aumentado de 0.01 para 0.05
+    foodDelay = 0.001,
     farmNPCs = false,
     npcDelay = 0.5,
 }
@@ -76,7 +76,7 @@ for _, v in ipairs(bossList) do bossEnabled[v.name] = true end
 local bossCooldown = {}
 for _, v in ipairs(bossList) do bossCooldown[v.name] = 0 end
 
--- NPCs (resumido para exemplo)
+-- NPCs
 local npcZones = {
     ["Zone 1"] = { "Evil Shroom", "Evil Foot", "Deermon" },
     ["Zone 2"] = { "Creepy Cat", "Enchanted Cobra", "Cursed Mummy" },
@@ -106,14 +106,13 @@ local function findNilBoss(name)
     end
 end
 
--- Limpeza de cache
 task.spawn(function() while task.wait(300) do cacheZones = {} end end)
 
--- LOOP PRINCIPAL (gerencia todas as farms em uma única thread)
-local function mainLoop()
-    while active do
-        -- Plant Eggs
-        if config.autoPlant and #eggsSelected > 0 then
+-- ========== LOOPS INDIVIDUAIS ==========
+
+local function PlantLoop()
+    while threads.plant and active and config.autoPlant do
+        if #eggsSelected > 0 then
             for _, zone in ipairs(eggsSelected) do
                 for _ = 1, config.plantBurstCount do
                     if not active then break end
@@ -122,140 +121,161 @@ local function mainLoop()
                 task.wait(config.plantBurstDelay)
             end
         end
+        task.wait(0.001)
+    end
+end
 
-        -- Hash Eggs
-        if config.autoHash then
-            for _ = 1, config.hashCount do
+local function HashLoop()
+    while threads.hash and active and config.autoHash do
+        for _ = 1, config.hashCount do
+            if not active then break end
+            pcall(HatchRemote.FireServer, HatchRemote)
+            task.wait(config.hashDelay)
+        end
+        task.wait(config.hashDelay)
+    end
+end
+
+local function FeedLoop()
+    while threads.feed and active and config.autoFeedNests do
+        local nests = Workspace:FindFirstChild("Nests")
+        if nests then
+            for _, nest in ipairs(nests:GetChildren()) do
                 if not active then break end
-                pcall(HatchRemote.FireServer, HatchRemote)
-                task.wait(config.hashDelay)
+                pcall(FeedRemote.FireServer, FeedRemote, nest)
             end
         end
+        task.wait(config.feedDelay)
+    end
+end
 
-        -- Feed Nests
-        if config.autoFeedNests then
-            local nests = Workspace:FindFirstChild("Nests")
-            if nests then
-                for _, nest in ipairs(nests:GetChildren()) do
-                    if not active then break end
-                    pcall(FeedRemote.FireServer, FeedRemote, nest)
-                end
-            end
-            task.wait(config.feedDelay)
-        end
-
-        -- Bosses
-        if config.farmBosses then
-            local pets = getPets()
-            if #pets > 0 then
-                local now = os.clock()
-                local petCycle = 0
-                for _, boss in ipairs(bossList) do
-                    if not active then break end
-                    if bossEnabled[boss.name] and now - bossCooldown[boss.name] >= config.bossDelay then
-                        if boss.special then
-                            pcall(ZonesRemote.InvokeServer, ZonesRemote, "RequestZoneMap", boss.zone)
-                        end
-                        local enemy
-                        if boss.nilBoss then
-                            enemy = findNilBoss(boss.name)
-                        else
-                            local zoneObj = getZone(boss.zone)
-                            enemy = zoneObj and zoneObj:FindFirstChild("Enemies") and zoneObj.Enemies:FindFirstChild(boss.name)
-                        end
-                        if enemy then
-                            petCycle = petCycle % #pets + 1
-                            pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[petCycle])
-                            bossCooldown[boss.name] = now
-                        end
-                    end
-                end
-            end
-            task.wait(0.2) -- pequena pausa após bosses
-        end
-
-        -- Summer
-        if config.farmSummer then
-            local zone = getZone("SummerEventZone")
-            local pets = getPets()
-            if zone and zone:FindFirstChild("Enemies") and #pets > 0 then
-                local enemies = zone.Enemies:GetChildren()
-                if #enemies > 0 then
-                    local idx = 1
-                    for _, enemy in ipairs(enemies) do
-                        if not active then break end
-                        pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[idx])
-                        idx = idx % #pets + 1
-                    end
-                end
-            end
-            task.wait(config.summerDelay)
-        end
-
-        -- Food
-        if config.farmFood then
-            local zone = getZone("Zone12.1")
-            local pets = getPets()
-            if zone and zone:FindFirstChild("FoodSpawns") and #pets > 0 then
-                local foods = zone.FoodSpawns:GetChildren()
-                if #foods > 0 then
-                    local idx = 1
-                    for _, food in ipairs(foods) do
-                        if not active then break end
-                        pcall(CollectionRemote.InvokeServer, CollectionRemote, "CollectFood", food, pets[idx])
-                        idx = idx % #pets + 1
-                    end
-                end
-            end
-            task.wait(config.foodDelay)
-        end
-
-        -- NPCs
-        if config.farmNPCs then
-            local pets = getPets()
-            if #pets > 0 then
+local function SummerLoop()
+    while threads.summer and active and config.farmSummer do
+        local zone = getZone("SummerEventZone")
+        local pets = getPets()
+        if zone and zone:FindFirstChild("Enemies") and #pets > 0 then
+            local enemies = zone.Enemies:GetChildren()
+            if #enemies > 0 then
                 local idx = 1
-                for zoneName, npcs in pairs(npcEnabled) do
+                for _, enemy in ipairs(enemies) do
                     if not active then break end
-                    local zoneNum = zoneName:match("%d+")
-                    local zoneObj = getZone("Zone" .. zoneNum)
-                    if zoneObj and zoneObj:FindFirstChild("Enemies") then
-                        for npcName, enabled in pairs(npcs) do
-                            if enabled then
-                                local enemy = zoneObj.Enemies:FindFirstChild(npcName)
-                                if enemy then
-                                    pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[idx])
-                                    idx = idx % #pets + 1
-                                end
+                    pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[idx])
+                    idx = idx % #pets + 1
+                end
+            end
+        end
+        task.wait(config.summerDelay)
+    end
+end
+
+local function FoodLoop()
+    while threads.food and active and config.farmFood do
+        local zone = getZone("Zone12.1")
+        local pets = getPets()
+        if zone and zone:FindFirstChild("FoodSpawns") and #pets > 0 then
+            local foods = zone.FoodSpawns:GetChildren()
+            if #foods > 0 then
+                local idx = 1
+                for _, food in ipairs(foods) do
+                    if not active then break end
+                    pcall(CollectionRemote.InvokeServer, CollectionRemote, "CollectFood", food, pets[idx])
+                    idx = idx % #pets + 1
+                end
+            end
+        end
+        task.wait(config.foodDelay)
+    end
+end
+
+local function BossLoop()
+    while threads.boss and active and config.farmBosses do
+        local pets = getPets()
+        if #pets > 0 then
+            local now = os.clock()
+            local petCycle = 0
+            for _, boss in ipairs(bossList) do
+                if not active then break end
+                if bossEnabled[boss.name] and now - bossCooldown[boss.name] >= config.bossDelay then
+                    if boss.special then
+                        pcall(ZonesRemote.InvokeServer, ZonesRemote, "RequestZoneMap", boss.zone)
+                    end
+                    local enemy
+                    if boss.nilBoss then
+                        enemy = findNilBoss(boss.name)
+                    else
+                        local zoneObj = getZone(boss.zone)
+                        enemy = zoneObj and zoneObj:FindFirstChild("Enemies") and zoneObj.Enemies:FindFirstChild(boss.name)
+                    end
+                    if enemy then
+                        petCycle = petCycle % #pets + 1
+                        pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[petCycle])
+                        bossCooldown[boss.name] = now
+                    end
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+end
+
+local function NPCLoop()
+    while threads.npc and active and config.farmNPCs do
+        local pets = getPets()
+        if #pets > 0 then
+            local idx = 1
+            for zoneName, npcs in pairs(npcEnabled) do
+                if not active then break end
+                local zoneNum = zoneName:match("%d+")
+                local zoneObj = getZone("Zone" .. zoneNum)
+                if zoneObj and zoneObj:FindFirstChild("Enemies") then
+                    for npcName, enabled in pairs(npcs) do
+                        if enabled then
+                            local enemy = zoneObj.Enemies:FindFirstChild(npcName)
+                            if enemy then
+                                pcall(CombatRemote.InvokeServer, CombatRemote, "AttackEnemy", enemy, pets[idx])
+                                idx = idx % #pets + 1
                             end
                         end
                     end
                 end
             end
-            task.wait(config.npcDelay)
         end
-
-        -- Pequena pausa global para não sobrecarregar
-        task.wait(0.01)
+        task.wait(config.npcDelay)
     end
 end
 
 -- Gerenciamento
+local function startThreads()
+    threads = { plant = true, hash = true, feed = true, boss = true, summer = true, food = true, npc = true }
+    if config.autoPlant then task.spawn(PlantLoop) end
+    if config.autoHash then task.spawn(HashLoop) end
+    if config.autoFeedNests then task.spawn(FeedLoop) end
+    if config.farmBosses then task.spawn(BossLoop) end
+    if config.farmSummer then task.spawn(SummerLoop) end
+    if config.farmFood then task.spawn(FoodLoop) end
+    if config.farmNPCs then task.spawn(NPCLoop) end
+end
+
+local function stopThreads()
+    threads = {}
+end
+
 local function start()
     if active then return end
     active = true
-    task.spawn(mainLoop)
+    startThreads()
 end
 
 local function stop()
     active = false
+    stopThreads()
 end
 
 -- Interface Rayfield
 local win = Rayfield:CreateWindow({
     Name = "Maverick Hub",
     LoadingTitle = "Carregando...",
-    LoadingSubtitle = "",
+    LoadingSubtitle = "Ultra Rápido",
     ConfigurationSaving = { Enabled = true, FolderName = "MaverickHub", FileName = "Config" },
     Theme = "Dark"
 })
@@ -335,13 +355,13 @@ end
 
 eggTab:CreateSection("Auto Hash")
 eggTab:CreateToggle({ Name = "Ativar Hash", CurrentValue = config.autoHash, Callback = function(v) config.autoHash = v end })
-eggTab:CreateSlider({ Name = "Quantidade", Range = {1, 10}, Increment = 1, Suffix = "x", CurrentValue = config.hashCount, Callback = function(v) config.hashCount = v end })
+eggTab:CreateSlider({ Name = "Quantidade", Range = {1, 50}, Increment = 5, Suffix = "x", CurrentValue = config.hashCount, Callback = function(v) config.hashCount = v end })
 eggTab:CreateSlider({ Name = "Delay (s)", Range = {0.0001, 0.01}, Increment = 0.0001, Suffix = "s", CurrentValue = config.hashDelay, Callback = function(v) config.hashDelay = v end })
 
 eggTab:CreateSection("Auto Plant")
 eggTab:CreateToggle({ Name = "Ativar Plant", CurrentValue = config.autoPlant, Callback = function(v) config.autoPlant = v end })
-eggTab:CreateSlider({ Name = "Ovos por burst", Range = {5, 30}, Increment = 5, Suffix = "x", CurrentValue = config.plantBurstCount, Callback = function(v) config.plantBurstCount = v end })
-eggTab:CreateSlider({ Name = "Delay entre bursts (s)", Range = {0.01, 0.1}, Increment = 0.01, Suffix = "s", CurrentValue = config.plantBurstDelay, Callback = function(v) config.plantBurstDelay = v end })
+eggTab:CreateSlider({ Name = "Ovos por burst", Range = {10, 100}, Increment = 10, Suffix = "x", CurrentValue = config.plantBurstCount, Callback = function(v) config.plantBurstCount = v end })
+eggTab:CreateSlider({ Name = "Delay entre bursts (s)", Range = {0.001, 0.1}, Increment = 0.001, Suffix = "s", CurrentValue = config.plantBurstDelay, Callback = function(v) config.plantBurstDelay = v end })
 
 eggTab:CreateSection("Auto Nests")
 eggTab:CreateToggle({ Name = "Ativar Nests", CurrentValue = config.autoFeedNests, Callback = function(v) config.autoFeedNests = v end })
@@ -363,7 +383,7 @@ for _, boss in ipairs(bossList) do
         Callback = function(v) bossEnabled[boss.name] = v end,
     })
 end
-bossTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.5, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.bossDelay, Callback = function(v) config.bossDelay = v end })
+bossTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.1, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.bossDelay, Callback = function(v) config.bossDelay = v end })
 
 -- Aba NPCs
 npcTab:CreateSection("Controle de NPCs")
@@ -387,16 +407,16 @@ for zoneName, npcs in pairs(npcZones) do
         })
     end
 end
-npcTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.5, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.npcDelay, Callback = function(v) config.npcDelay = v end })
+npcTab:CreateSlider({ Name = "Cooldown (s)", Range = {0.1, 2}, Increment = 0.1, Suffix = "s", CurrentValue = config.npcDelay, Callback = function(v) config.npcDelay = v end })
 
--- Aba Farms (Summer e Food)
+-- Aba Farms
 otherTab:CreateSection("Summer Event")
 otherTab:CreateToggle({
     Name = "Ativar Summer Farm",
     CurrentValue = config.farmSummer,
     Callback = function(v) config.farmSummer = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.summerDelay, Callback = function(v) config.summerDelay = v end })
 
 otherTab:CreateSection("Food Farm")
 otherTab:CreateToggle({
@@ -404,4 +424,4 @@ otherTab:CreateToggle({
     CurrentValue = config.farmFood,
     Callback = function(v) config.farmFood = v end
 })
-otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.01, 1}, Increment = 0.01, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })
+otherTab:CreateSlider({ Name = "Delay (s)", Range = {0.001, 1}, Increment = 0.001, Suffix = "s", CurrentValue = config.foodDelay, Callback = function(v) config.foodDelay = v end })
